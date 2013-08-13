@@ -4,6 +4,13 @@
 function DataQuery(laureates, prizes) {
 
 	/**
+	 * Returns an array of laureates applying the need filters.
+	 */
+	var laureates = function() {
+		return laureates.slice(0);
+	}
+
+	/**
 	 * Returns an array of laureates grouped by country.
 	 * Note all laureates without born neither died country code are ignored.
 	 * 
@@ -856,6 +863,7 @@ var chartOptions = {
 	countryName: 'World',
 	countryCode: null,
 	year: 'All',
+	category: 'All',
 	died: false
 }
 
@@ -907,10 +915,19 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 	});
 
 	$(document).on("onCategorySelected", function(e) {
-		console.log(e);
+		console.log(e, "Update TABLE");
+
 
 	});
 
+	$('#loadingMsg').hide(function(){
+		$('#loadingMsg').remove();	
+	});
+	
+	// Start the tour
+	showTour();
 });
 
-
+function showTour() {
+	introJs().start();
+}

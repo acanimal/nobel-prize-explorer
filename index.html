@@ -11,6 +11,8 @@
 		<!--[if lte IE 8]>
 		    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.6.4/leaflet.ie.css" />
 		<![endif]-->
+		<!-- IntroJS -->
+		<link href="css/introjs.min.css" rel="stylesheet" media="screen">
 		<style>
 			#map {
 				width: 100%;
@@ -37,10 +39,6 @@
 				margin-top: 15px;
 				border: 1px solid #eee;
 				padding: 5px;
-			}
-
-			.sidebar {
-				/*width: 250px;*/
 			}
 
 			.info {
@@ -73,6 +71,10 @@
 			#selectedCountry, #selectedYear, #selectedCategory, #queryCountry, #queryYear, #queryCategory {
 				font-weight: bold;;
 			}
+
+			.introjs-helperNumberLayer {
+				display: none;
+			}
 		</style>
 
 	</head>
@@ -80,24 +82,31 @@
 
 		<div class="container">
 			<div class="row">
-				<div class="span2 sidebar">
+				<div class="span2">
 					<!--Sidebar content-->
 					<h1>The Nobel Prize History</h1>
 					<p>
 						A visual exploration of the history
 					</p>
-					<button class="btn btn-small btn-primary">By @acanimal</button>
-					<a href="#">@acanimal</a>
+
+					<hr/> 
+
+					Need help? Take a <button class="btn btn-primary btn-small" onclick="showTour()">Tour</button>
+					<hr/> 
 
 					<iframe src="http://ghbtns.com/github-btn.html?user=acanimal&repo=tagger.js&type=fork"
   allowtransparency="true" frameborder="0" scrolling="0" width="62" height="20"></iframe>
-			        <a href="https://twitter.com/share" class="twitter-share-button" data-via="acanimal">Tweet</a>
+			        <a href="https://twitter.com/share" class="twitter-share-button" data-via="acanimal" data-hashtags="nobelprize_explorer">Tweet</a>
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 			        <a href="https://twitter.com/acanimal" class="twitter-follow-button" data-show-count="false">Follow @acanimal</a>
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 				</div>
 
-				<div class="span10 main">
+				<div class="span10">
+					
+					<h4 id="loadingMsg">Loading...</h4>
 
-					<div class="row">
+					<div class="row" data-step="1" data-intro="The choropleth map show the number of laureates born or died in a country.<br/><ul><li>Click on a country to select it and filter information.</li><li>Click again to unselect and choose the whole World again.</li></ul>">
 						
 						<div class="span10 section">
 							<h5 id="map-title"></h5>
@@ -106,9 +115,9 @@
 
 					</div>
 
-					<div class="row">
+					<div class="row" data-step="2" data-intro="Line chart show the evolution on the number of prizes and the number of laureates a long of the years.<ul><li>Click on a year point to select it and filter information by that year.</li><li>Click on the chart to unselect and choose the whole period again.</li></ul>">
 							
-						<div class="span10 section">
+						<div class="span10 section" id="tourYearChart">
 							<h5 id="prizes-by-year-number-laureates-title"></h5>
 							<div id="prizes-by-year-number-laureates-chart"></div>
 						</div>
@@ -116,17 +125,17 @@
 					</div>
 
 					<div class="row">
-						<div class="span6 section">
+						<div class="span6 section" id="tourCategoriesChart" data-step="3" data-intro="Column chart show the number of laureates and prizes grouped by categories.<ul><li>Click on a category column to select it and filter information by that category.</li><li>Click on the chart to unselect and choose the whole period again.</li></ul>">
 							<h5 id='prizes-by-category-title'></h5>
 							<div id="prizes-by-category-chart"></div>
 						</div>
-						<div class="span4 section">
+						<div class="span4 section" id="tourShareChart" data-step="4" data-intro="This column chart shows the number of prizes shared by laureates. For example, you can see how many prizes has been shared by three laureates.">
 							<h5 id="prizes-shared-by-laureates-number-title"></h5>
 							<div id="prizes-shared-by-laureates-number-chart"></div>
 						</div>					
 					</div>
 
-					<div class="row">
+					<div class="row" data-step="5" data-intro="The table show the laureates information once filtered by previous chart options.">
 						<div class="span10 section">
 							<h5>Laureates on country <span id="queryCountry">World</span> 
 								for year <span id="queryYear">All</span> and
@@ -170,10 +179,20 @@
 			</div>
 		</div>
 
+		<ol id="tour" style="display: none;">
+			<li data-target="#tourMapChart" data-angle="130">
+				The first step in the tour
+			</li>
+			<li data-target="tourYearChart" data-options="distance:20">
+				This is the second step in the tour
+			</li>
+		</ol>
+
 		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 		<script src="js/bootstrap.min.js"></script>
 		<script src="http://cdn.leafletjs.com/leaflet-0.6.4/leaflet.js"></script>
 		<script src="http://code.highcharts.com/highcharts.js"></script>
+		<script src="js/intro.min.js"></script>
 		<script src="nobelprize.js"></script>
 		<script type="text/javascript">
 
