@@ -111,24 +111,51 @@ function DataQuery(laureates, prizes) {
 	}
 
 	/**
+	 * Find a laureate by its ID
+	 * 
+	 * @param  {[type]} id [description]
+	 * @return {[type]}    [description]
+	 */
+	var findLaureateById = function(id) {
+		for(var i=0; i< laureates.length; i++) {
+			if(laureates[i].id === id) {
+				return laureates[i];
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Returns the number of laureates by year
 	 * 
 	 * @param  {String} country If set the group is only done for this country
 	 * @return {Array}         Array of {year, value}
 	 */
-	var laureatesByYear = function(country) {
-		var result = [], i;
-		var p, c, item;
+	var laureatesByYear = function(country, died) {
+		var result = [], i, j, l;
+		var p, c, item, inc;
 		for(i=0; i< prizes.length; i ++) {
 			p = prizes[i];
 			c = p.year;
 			
+			// Compute increment
+			inc = p.laureates.length;
+			if(country) {
+				inc = 0;
+				for(j=0; j< p.laureates.length; j++) {
+					l = findLaureateById(p.laureates[j].id);
+					if( (died && l.diedCountryCode === country) || l.bornCountryCode === country) {
+						inc++;
+					}
+				}
+			}
+
 			// Check if an item with the year exists
 			item = $.grep(result, function(e){ return e.year === c; });
 			if(!item.length) {
-				result.push({year: c, value: 1});
+				result.push({year: c, value: inc});
 			} else {
-				item[0].value+= p.laureates.length;
+				item[0].value+= inc;
 			}
 		}
 		return result;
@@ -171,44 +198,70 @@ function DataQuery(laureates, prizes) {
  * @param {String} countryElement ID of the element where to place the name
  * of the selected country
  * @param {DataLoad} [dataQuery] Instance of DataQuery to query information.
+ * @param {[type]} chartOptions [description]
  */
-function MapChart(mapElement, titleElement, dataQuery) {
-	var map, geojson, previousSelected, info, legend, countryCodes, country = "World";
-	var queryByDieCountries = false;
+function MapChart(mapElement, titleElement, dataQuery, chartOptions) {
+	var map, geojson, previousSelected, info, legend, countryCodes;
 
 	updateTitle();
 	initializeMap();
 	updateCountryCodes();
 
-	// Register listeners 
-	$('#bornCountryOption').on('click', function() {
-		queryByDieCountries = false;
-		updateCountryCodes();
-		
-		// Refresh countries
-		geojson.setStyle(style);
-		legend.removeFrom(map);
-		addLegendControl();
-	});
-	$('#dieCountryOption').on('click', function() {
-		queryByDieCountries = true;
-		updateCountryCodes();
-
-		// Refresh countries
-		geojson.setStyle(style);
-		legend.removeFrom(map);
-		addLegendControl();
-	});
-	
 	function updateTitle() {
-		$('#'+titleElement).html('Prizes on <span id="selectedCountry">'+country+'</span> depending '+
+		$('#bornCountryOption').off('click');
+		$('#dieCountryOption').off('click');
+
+		$('#'+titleElement).empty();
+
+		var msg;
+		if(!chartOptions.died) {
+			msg = 'Prizes on <b>'+chartOptions.countryName+'</b> depending '+
 			'on <em>born</em> <input type="radio" name="borndieRadios" id="bornCountryOption" value="born" checked> '+
-			'or <em>die</em> <input type="radio" name="borndieRadios" id="dieCountryOption" value="die"> '+
-			'country of laureates.');
+			'or <em>died</em> <input type="radio" name="borndieRadios" id="dieCountryOption" value="die"> '+
+			' laureates'
+		} else {
+			msg = 'Prizes on <b>'+chartOptions.countryName+'</b> depending '+
+			'on <em>born</em> <input type="radio" name="borndieRadios" id="bornCountryOption" value="born" > '+
+			'or <em>died</em> <input type="radio" name="borndieRadios" id="dieCountryOption" value="die" checked> '+
+			' laureates'
+		}
+		$('#'+titleElement).html(msg);
+
+		// Register listeners 
+		$('#bornCountryOption').on('click', function() {
+			chartOptions.died = false;
+			updateCountryCodes();
+			
+			// Refresh countries
+			geojson.setStyle(style);
+			legend.removeFrom(map);
+			addLegendControl();
+
+			// Ugly way to trigger events
+			$.event.trigger({
+				type: 'onCountrySelected',
+				message: chartOptions
+			});
+		});
+		$('#dieCountryOption').on('click', function() {
+			chartOptions.died = true;
+			updateCountryCodes();
+
+			// Refresh countries
+			geojson.setStyle(style);
+			legend.removeFrom(map);
+			addLegendControl();
+
+			// Ugly way to trigger events
+			$.event.trigger({
+				type: 'onCountrySelected',
+				message: chartOptions
+			});
+		});
 	}
 
 	function updateCountryCodes() {
-		if(!queryByDieCountries) {
+		if(!chartOptions.died) {
 			countryCodes = dataQuery.laureatesByCountry();
 		} else {
 			countryCodes = dataQuery.laureatesByCountry(true);
@@ -217,7 +270,7 @@ function MapChart(mapElement, titleElement, dataQuery) {
 
 	function getColor(d) {
 
-		if(queryByDieCountries) {
+		if(chartOptions.died) {
 			// Red palette
 		    return d > 100 ? '#800026' :
 		           d > 50  ? '#BD0026' :
@@ -303,25 +356,28 @@ function MapChart(mapElement, titleElement, dataQuery) {
 			e.target.selected = false;
 			map.setView([30,0], 2)
 
-			country = "World";
+			chartOptions.countryName = "World";
+			chartOptions.countryCode = null;
 			updateTitle();
 
 			// Ugly way to trigger events
 			$.event.trigger({
 				type: 'onCountrySelected',
-				message: "WORLD"
+				message: chartOptions
 			});
 		} else {
 			e.target.selected = true;
 			map.fitBounds(e.target.getBounds());
 
-			country = e.target.feature.properties.name;
+			chartOptions.countryName = e.target.feature.properties.name;
+			chartOptions.countryCode = e.target.feature.properties.iso_a2;
+
 			updateTitle();
 
 			// Ugly way to trigger events
 			$.event.trigger({
 				type: 'onCountrySelected',
-				message: e.target.feature.properties.iso_a2
+				message: chartOptions
 			});
 		}
 	}
@@ -415,11 +471,12 @@ function MapChart(mapElement, titleElement, dataQuery) {
  * Draws a line chart show the number of prizes and laureates per year.
  * 
  * @param {[type]} chartElement [description]
- * @param {[type]} yearElement  [description]
+ * @param {[type]} titleElement  [description]
  * @param {[type]} dataQuery   [description]
  */
-function PrizesByYearChart(chartElement, yearElement, dataQuery) {
-	var country = "World";
+function PrizesByYearChart(chartElement, titleElement, dataQuery, chartOptions) {
+
+	updateTitle();
 
 	var lyArr = dataQuery.convertToXyArray(dataQuery.laureatesByYear(), ['year', 'value']);
 	var pyArr = dataQuery.convertToXyArray(dataQuery.prizesByYear(), ['year', 'value']);
@@ -430,12 +487,13 @@ function PrizesByYearChart(chartElement, yearElement, dataQuery) {
 			type: 'spline',
 			events: {
 				click: function(e) {
-					$('#'+yearElement).text('All');
+					chartOptions.year = 'All';
+					updateTitle();
 
 					// Ugly way to trigger events
 					$.event.trigger({
 						type: 'onYearSelected',
-						message: "All"
+						message: chartOptions
 					});
 				}
 			}
@@ -451,19 +509,21 @@ function PrizesByYearChart(chartElement, yearElement, dataQuery) {
         yAxis: {
             title: {
                 text: ''
-            }
+            },
+            min: 0
         },
         plotOptions: {
         	series: {
         		point: {
         			events: {
         				click: function(e) {
-        					$('#'+yearElement).text(e.point.category);
+        					chartOptions.year = e.point.category;
+        					updateTitle();
 
         					// Ugly way to trigger events
 							$.event.trigger({
 								type: 'onYearSelected',
-								message: e.point.category
+								message: chartOptions
 							});
         				}
         			}
@@ -482,22 +542,34 @@ function PrizesByYearChart(chartElement, yearElement, dataQuery) {
             shared: true
         },
 		series: [
-			{name: 'Laureates', data: lyArr},
-			{name: 'Prizes', data: pyArr}
+			{id: 'Laureates', name: 'Laureates', data: lyArr},
+			{id: 'Prizes', name: 'Prizes', data: pyArr}
 		]
 	});
 
-	function updateCountry(c) {
-		country = c;
+	function updateTitle() {
+		$('#'+titleElement).html('Laureates & Prizes on <b>'+chartOptions.countryName+'</b>');
+	}
 
-		lyArr = dataQuery.convertToXyArray(dataQuery.laureatesByYear(country), ['year', 'value']);
-		pyArr = dataQuery.convertToXyArray(dataQuery.prizesByYear(country), ['year', 'value']);
+	/**
+	 * Update chart properties
+	 * 
+	 * @param  {Object} options Options to update the chart: name, code and died.
+	 */
+	function update() {
+		
+		updateTitle();
 
-		// TODO Update series
+		lyArr = dataQuery.convertToXyArray(dataQuery.laureatesByYear(chartOptions.countryCode, chartOptions.died), ['year', 'value']);
+		pyArr = dataQuery.convertToXyArray(dataQuery.prizesByYear(chartOptions.countryCode, chartOptions.died), ['year', 'value']);
+
+		// Update series data
+		yearChart.get('Laureates').setData(lyArr);
+		yearChart.get('Prizes').setData(pyArr);
 	}
 
 	return {
-		updateCountry: updateCountry
+		update: update
 	}
 }
 
@@ -508,12 +580,14 @@ function PrizesByYearChart(chartElement, yearElement, dataQuery) {
  * @param {[type]} categoryElement [description]
  * @param {[type]} dataQuery      [description]
  */
-function PrizesByCategoryChart(chartElement, categoryElement, dataQuery) {
-	var country = "World", year = "All";
+function PrizesByCategoryChart(chartElement, titleElement, dataQuery, chartOptions) {
+
+	updateTitle();
 
 	var pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(), ['category', 'value'], true);
 	var categories = [];
 	for(var i=0; i< pcArr.length; i++) { categories.push(pcArr[i][0]);}
+
 	var categoryChart = new Highcharts.Chart({
 		chart: {
 			renderTo: chartElement,
@@ -530,12 +604,13 @@ function PrizesByCategoryChart(chartElement, categoryElement, dataQuery) {
         		point: {
         			events: {
         				click: function(e) {
-        					$('#'+categoryElement).text(e.point.category);
+        					chartOptions.category = e.point.category;
+        					updateTitle();
         					
         					// Ugly way to trigger events
 							$.event.trigger({
 								type: 'onCategorySelected',
-								message: e.point.category
+								message: chartOptions
 							});
         				}
         			}
@@ -566,24 +641,18 @@ function PrizesByCategoryChart(chartElement, categoryElement, dataQuery) {
 		]
 	});
 
-	function updateCountry(c) {
-		country = c;
-
-		pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(country, year), ['category', 'value'], true);
-
-		// TODO Update series
+	function updateTitle() {
+		var msg = 'Prizes by category on <b>'+chartOptions.countryName+'</b> for year <b>'+chartOptions.year+'</b>';
+		$('#'+titleElement).html(msg);
 	}
-	function updateYear(y) {
-		year = y;
 
-		pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(country, year), ['category', 'value'], true);
-
-		// TODO Update series
+	function update() {
+		updateTitle();
+		pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(chartOptions.countryCode, chartOptions.year), ['category', 'value'], true);
 	}
 
 	return {
-		updateCountry: updateCountry,
-		updateYear: updateYear
+		update: update
 	}
 }
 
@@ -629,6 +698,17 @@ function PrizesBySharedChart(chartElement, dataQuery) {
 
 }
 
+/**
+ * General options used for the charts.
+ */
+var chartOptions = {
+	countryName: 'World',
+	countryCode: null,
+	year: 'All',
+	died: false
+}
+
+
 //
 // Application starts here !!!
 //
@@ -645,19 +725,35 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 	prizes = prizesRes[0].prizes;
 
 	var dataQuery = new DataQuery(laureates, prizes);
-	var mapChart = new MapChart('map', 'mapTitle', dataQuery);
+	var mapChart = new MapChart('map', 'map-title', dataQuery, chartOptions);
 
-	var prizesByYearChart = new PrizesByYearChart('prizes-by-year-number-laureates-chart', 'selectedYear', dataQuery);
-	var prizesByCategory = new PrizesByCategoryChart('prizes-by-category-chart', 'selectedCategory', dataQuery);
-	var prizesBySharedChart = new PrizesBySharedChart('prizes-shared-by-laureates-number-chart', dataQuery);
+	var prizesByYearChart = new PrizesByYearChart(
+		'prizes-by-year-number-laureates-chart', 
+		'prizes-by-year-number-laureates-title', 
+		dataQuery,
+		chartOptions
+	);
+	var prizesByCategory = new PrizesByCategoryChart(
+		'prizes-by-category-chart', 
+		'prizes-by-category-title', 
+		dataQuery,
+		chartOptions
+	);
+	var prizesBySharedChart = new PrizesBySharedChart(
+		'prizes-shared-by-laureates-number-chart', 
+		dataQuery,
+		chartOptions
+	);
 
 	// Listen for events to update charts
 	$(document).on("onCountrySelected", function(e) {
-		console.log(e);
+		prizesByYearChart.update();
+		prizesByCategory.update();
 	});
 
 	$(document).on("onYearSelected", function(e) {
 		console.log(e);
+		prizesByCategory.update();
 	});
 
 	$(document).on("onCategorySelected", function(e) {
