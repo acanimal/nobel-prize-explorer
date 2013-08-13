@@ -39,7 +39,7 @@ function DataQuery(laureates, prizes) {
 	}
 
 	/**
-	 * Returns the prizes grouped by category
+	 * Returns the number of prizes grouped by category
 	 * 
 	 * @param  {String} country If set the group is only done for this country
 	 * @return {Array}         Array of {category, value}
@@ -81,6 +81,48 @@ function DataQuery(laureates, prizes) {
 				result.push({category: c, value: 1});
 			} else {
 				item[0].value++;
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Returns the number of laureates grouped by category
+	 * 
+	 * @param  {[type]} country [description]
+	 * @param  {[type]} died    [description]
+	 * @param  {[type]} year    [description]
+	 * @return {[type]}         [description]
+	 */
+	var laureatesByCategory = function(country, died, year) {
+		var result = [], i, j;
+		var p, c, item, l, inc;
+		for(i=0; i< prizes.length; i ++) {
+			p = prizes[i];
+			c = p.category;
+			
+			if(year && year!='All' && year!=p.year) {
+				continue;
+			}
+
+			// Compute increment
+			inc = p.laureates.length;
+			if(country) {
+				inc = 0;
+				for(j=0; j< p.laureates.length; j++) {
+					l = findLaureateById(p.laureates[j].id);
+					if( (died && l.diedCountryCode === country) || l.bornCountryCode === country) {
+						inc++;
+					}
+				}
+			}
+
+			// Check if an item with the category exists
+			item = $.grep(result, function(e){ return e.category === c; });
+			if(!item.length) {
+				result.push({category: c, value: inc});
+			} else {
+				item[0].value+=inc;
 			}
 		}
 		return result;
@@ -140,13 +182,33 @@ function DataQuery(laureates, prizes) {
 	 * @param  {String} country If set the group is only done for this country
 	 * @return {Array}         Array of {year, value}
 	 */
-	var prizesByYear = function(country) {
-		var result = [], i;
-		var p, c, item;
+	var prizesByYear = function(country, died) {
+		var result = [], i, j, l;
+		var p, c, item, cc, none;
 		for(i=0; i< prizes.length; i ++) {
 			p = prizes[i];
 			c = p.year;
 			
+			if(country && country!='World') {
+				none = true;
+				// If none of the laureates are from the given country ignore the prize
+				for(j=0; j< p.laureates.length; j++) {
+					l = findLaureateById(p.laureates[j].id);
+					if(died && l.diedCountryCode) {
+						cc = l.diedCountryCode;
+					} else {
+						cc = l.bornCountryCode;
+					}
+					if(cc === country) {
+						none = false;
+						break;
+					}
+				}
+				if(none) {
+					continue;
+				}
+			}
+
 			// Check if an item with the year exists
 			item = $.grep(result, function(e){ return e.year === c; });
 			if(!item.length) {
@@ -156,21 +218,6 @@ function DataQuery(laureates, prizes) {
 			}
 		}
 		return result;
-	}
-
-	/**
-	 * Find a laureate by its ID
-	 * 
-	 * @param  {[type]} id [description]
-	 * @return {[type]}    [description]
-	 */
-	var findLaureateById = function(id) {
-		for(var i=0; i< laureates.length; i++) {
-			if(laureates[i].id === id) {
-				return laureates[i];
-			}
-		}
-		return null;
 	}
 
 	/**
@@ -209,6 +256,21 @@ function DataQuery(laureates, prizes) {
 		return result;
 	}
 
+		/**
+	 * Find a laureate by its ID
+	 * 
+	 * @param  {[type]} id [description]
+	 * @return {[type]}    [description]
+	 */
+	var findLaureateById = function(id) {
+		for(var i=0; i< laureates.length; i++) {
+			if(laureates[i].id === id) {
+				return laureates[i];
+			}
+		}
+		return null;
+	}
+
 	/** 
 	 * Helper method to get a [x,y] array from an array of objects.
 	 */
@@ -231,6 +293,7 @@ function DataQuery(laureates, prizes) {
 	return {
 		laureatesByCountry: laureatesByCountry,
 		prizesByCategory: prizesByCategory,
+		laureatesByCategory: laureatesByCategory,
 		prizesByLaureatesShared: prizesByLaureatesShared,
 		prizesByYear: prizesByYear,
 		laureatesByYear: laureatesByYear,
@@ -517,7 +580,7 @@ function MapChart(mapElement, titleElement, dataQuery) {
  * @param {[type]} titleElement  [description]
  * @param {[type]} dataQuery   [description]
  */
-function PrizesByYearChart(chartElement, titleElement, dataQuery) {
+function YearChart(chartElement, titleElement, dataQuery) {
 
 	updateTitle();
 
@@ -623,11 +686,13 @@ function PrizesByYearChart(chartElement, titleElement, dataQuery) {
  * @param {[type]} categoryElement [description]
  * @param {[type]} dataQuery      [description]
  */
-function PrizesByCategoryChart(chartElement, titleElement, dataQuery) {
+function CategoryChart(chartElement, titleElement, dataQuery) {
 
 	updateTitle();
 
+	var lcArr = dataQuery.convertToXyArray(dataQuery.laureatesByCategory(), ['category', 'value'], true);
 	var pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(), ['category', 'value'], true);
+
 	var categories = [];
 	for(var i=0; i< pcArr.length; i++) { categories.push(pcArr[i][0]);}
 
@@ -677,11 +742,16 @@ function PrizesByCategoryChart(chartElement, titleElement, dataQuery) {
         },
         tooltip: {
             formatter: function() {
-                return '<b>' + this.y + '</b> prizes on the <br/><b>'+this.key+'</b> category';
+            	if(this.series.chart.get('nLaureates') == this.series) {
+            		return '<b>' + this.y + ' laureates</b> on the <br/><b>'+this.key+'</b> category';
+            	} else {
+            		return '<b>' + this.y + ' prizes</b> on the <br/><b>'+this.key+'</b> category';
+            	}
             }
         },
 		series: [
-			{id: 'count', name: 'Count', data: pcArr}
+			{id: 'nLaureates', name: 'Num Laureates', data: lcArr},
+			{id: 'nPrizes', name: 'Num Prizes', data: pcArr}
 		]
 	});
 
@@ -697,12 +767,14 @@ function PrizesByCategoryChart(chartElement, titleElement, dataQuery) {
 
 	function update() {
 		updateTitle();
+		lcArr = dataQuery.convertToXyArray(dataQuery.laureatesByCategory(chartOptions.countryCode, chartOptions.died, chartOptions.year), ['category', 'value'], true);
 		pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(chartOptions.countryCode, chartOptions.died, chartOptions.year), ['category', 'value'], true);
 		categories = [];
 		for(var i=0; i< pcArr.length; i++) { categories.push(pcArr[i][0]);}
 
 		// Update series data
-		categoryChart.get('count').setData(pcArr);
+		categoryChart.get('nPrizes').setData(pcArr);
+		categoryChart.get('nLaureates').setData(lcArr);
 		categoryChart.get('xAxis').setCategories(categories);
 	}
 
@@ -717,12 +789,12 @@ function PrizesByCategoryChart(chartElement, titleElement, dataQuery) {
  * @param {[type]} chartElement [description]
  * @param {[type]} dataQuery   [description]
  */
-function PrizesBySharedChart(chartElement, titleElement, dataQuery) {
+function SharedChart(chartElement, titleElement, dataQuery) {
 	
 	updateTitle();
 
 	var pslArr = dataQuery.convertToXyArray(dataQuery.prizesByLaureatesShared(), ['shared', 'value']);
-	var categoryChart = new Highcharts.Chart({
+	var sharedChart = new Highcharts.Chart({
 		chart: {
 			renderTo: chartElement,
 			type: 'column'
@@ -765,10 +837,10 @@ function PrizesBySharedChart(chartElement, titleElement, dataQuery) {
 
 	function update() {
 		updateTitle();
-		pslArr = dataQuery.convertToXyArray(dataQuery.prizesByLaureatesShared(chartOptions.countryCode, chartOptions.year), ['shared', 'value']);
+		pslArr = dataQuery.convertToXyArray(dataQuery.prizesByLaureatesShared(chartOptions.countryCode, chartOptions.died, chartOptions.year), ['shared', 'value']);
 
 		// Update series data
-		categoryChart.get('shared').setData(pslArr);
+		sharedChart.get('shared').setData(pslArr);
 	}
 
 	return {
@@ -806,17 +878,17 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 	var dataQuery = new DataQuery(laureates, prizes);
 	var mapChart = new MapChart('map', 'map-title', dataQuery);
 
-	var prizesByYearChart = new PrizesByYearChart(
+	var yearChart = new YearChart(
 		'prizes-by-year-number-laureates-chart', 
 		'prizes-by-year-number-laureates-title', 
 		dataQuery
 	);
-	var prizesByCategory = new PrizesByCategoryChart(
+	var categoryChart = new CategoryChart(
 		'prizes-by-category-chart', 
 		'prizes-by-category-title', 
 		dataQuery
 	);
-	var prizesBySharedChart = new PrizesBySharedChart(
+	var sharedChart = new SharedChart(
 		'prizes-shared-by-laureates-number-chart', 
 		'prizes-shared-by-laureates-number-title',
 		dataQuery
@@ -824,14 +896,14 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 
 	// Listen for events to update charts
 	$(document).on("onCountrySelected", function(e) {
-		prizesByYearChart.update();
-		prizesByCategory.update();
-		prizesBySharedChart.update();
+		yearChart.update();
+		categoryChart.update();
+		sharedChart.update();
 	});
 
 	$(document).on("onYearSelected", function(e) {
-		prizesByCategory.update();
-		prizesBySharedChart.update();
+		categoryChart.update();
+		sharedChart.update();
 	});
 
 	$(document).on("onCategorySelected", function(e) {
