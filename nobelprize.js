@@ -7,10 +7,10 @@ function DataQuery(laureates, prizes) {
 	 * Returns an array of laureates grouped by country.
 	 * Note all laureates without born neither died country code are ignored.
 	 * 
-	 * @param  {boolean} byDiedCountry Specifies if we must group by born or died country
+	 * @param  {boolean} died Specifies if we must group by born or died country
 	 * @return {Array}               Array of {code, laureateList}
 	 */
-	var laureatesByCountry = function(byDiedCountry) {
+	var laureatesByCountry = function(died) {
 		var result = [], i;
 		var l, c, item;
 		for(i=0; i< laureates.length; i ++) {
@@ -21,7 +21,7 @@ function DataQuery(laureates, prizes) {
 				continue;
 			}
 
-			if(byDiedCountry && l.diedCountryCode) {
+			if(died && l.diedCountryCode) {
 				c = l.diedCountryCode;
 			} else {
 				c = l.bornCountryCode;
@@ -44,13 +44,37 @@ function DataQuery(laureates, prizes) {
 	 * @param  {String} country If set the group is only done for this country
 	 * @return {Array}         Array of {category, value}
 	 */
-	var prizesByCategory = function(country) {
-		var result = [], i;
-		var p, c, item;
+	var prizesByCategory = function(country, died, year) {
+		var result = [], i, j, none;
+		var p, c, item, l, cc;
 		for(i=0; i< prizes.length; i ++) {
 			p = prizes[i];
 			c = p.category;
 			
+			if(year && year!='All' && year!=p.year) {
+				continue;
+			}
+
+			if(country && country!='World') {
+				none = true;
+				// If none of the laureates are from the given country ignore the prize
+				for(j=0; j< p.laureates.length; j++) {
+					l = findLaureateById(p.laureates[j].id);
+					if(died && l.diedCountryCode) {
+						cc = l.diedCountryCode;
+					} else {
+						cc = l.bornCountryCode;
+					}
+					if(cc === country) {
+						none = false;
+						break;
+					}
+				}
+				if(none) {
+					continue;
+				}
+			}
+
 			// Check if an item with the category exists
 			item = $.grep(result, function(e){ return e.category === c; });
 			if(!item.length) {
@@ -68,13 +92,37 @@ function DataQuery(laureates, prizes) {
 	 * @param  {String} country If set the group is only done for this country
 	 * @return {Array}         Array of {category, value}
 	 */
-	var prizesByLaureatesShared = function(country) {
-		var result = [], i;
-		var p, c, item;
+	var prizesByLaureatesShared = function(country, died, year) {
+		var result = [], i, j;
+		var p, c, item, cc, none, l;
 		for(i=0; i< prizes.length; i ++) {
 			p = prizes[i];
 			c = p.laureates.length;
 			
+			if(year && year!='All' && year!=p.year) {
+				continue;
+			}
+
+			if(country && country!='World') {
+				none = true;
+				// If none of the laureates are from the given country ignore the prize
+				for(j=0; j< p.laureates.length; j++) {
+					l = findLaureateById(p.laureates[j].id);
+					if(died && l.diedCountryCode) {
+						cc = l.diedCountryCode;
+					} else {
+						cc = l.bornCountryCode;
+					}
+					if(cc === country) {
+						none = false;
+						break;
+					}
+				}
+				if(none) {
+					continue;
+				}
+			}
+
 			// Check if an item with the category exists
 			item = $.grep(result, function(e){ return e.shared === c; });
 			if(!item.length) {
@@ -198,9 +246,8 @@ function DataQuery(laureates, prizes) {
  * @param {String} countryElement ID of the element where to place the name
  * of the selected country
  * @param {DataLoad} [dataQuery] Instance of DataQuery to query information.
- * @param {[type]} chartOptions [description]
  */
-function MapChart(mapElement, titleElement, dataQuery, chartOptions) {
+function MapChart(mapElement, titleElement, dataQuery) {
 	var map, geojson, previousSelected, info, legend, countryCodes;
 
 	updateTitle();
@@ -215,15 +262,15 @@ function MapChart(mapElement, titleElement, dataQuery, chartOptions) {
 
 		var msg;
 		if(!chartOptions.died) {
-			msg = 'Prizes on <b>'+chartOptions.countryName+'</b> depending '+
+			msg = 'Laureates by country depending '+
 			'on <em>born</em> <input type="radio" name="borndieRadios" id="bornCountryOption" value="born" checked> '+
 			'or <em>died</em> <input type="radio" name="borndieRadios" id="dieCountryOption" value="die"> '+
-			' laureates'
+			' country'
 		} else {
-			msg = 'Prizes on <b>'+chartOptions.countryName+'</b> depending '+
+			msg = 'Laureates by country depending '+
 			'on <em>born</em> <input type="radio" name="borndieRadios" id="bornCountryOption" value="born" > '+
 			'or <em>died</em> <input type="radio" name="borndieRadios" id="dieCountryOption" value="die" checked> '+
-			' laureates'
+			' country'
 		}
 		$('#'+titleElement).html(msg);
 
@@ -261,11 +308,7 @@ function MapChart(mapElement, titleElement, dataQuery, chartOptions) {
 	}
 
 	function updateCountryCodes() {
-		if(!chartOptions.died) {
-			countryCodes = dataQuery.laureatesByCountry();
-		} else {
-			countryCodes = dataQuery.laureatesByCountry(true);
-		}
+		countryCodes = dataQuery.laureatesByCountry(chartOptions.died);
 	}
 
 	function getColor(d) {
@@ -474,7 +517,7 @@ function MapChart(mapElement, titleElement, dataQuery, chartOptions) {
  * @param {[type]} titleElement  [description]
  * @param {[type]} dataQuery   [description]
  */
-function PrizesByYearChart(chartElement, titleElement, dataQuery, chartOptions) {
+function PrizesByYearChart(chartElement, titleElement, dataQuery) {
 
 	updateTitle();
 
@@ -580,7 +623,7 @@ function PrizesByYearChart(chartElement, titleElement, dataQuery, chartOptions) 
  * @param {[type]} categoryElement [description]
  * @param {[type]} dataQuery      [description]
  */
-function PrizesByCategoryChart(chartElement, titleElement, dataQuery, chartOptions) {
+function PrizesByCategoryChart(chartElement, titleElement, dataQuery) {
 
 	updateTitle();
 
@@ -618,6 +661,7 @@ function PrizesByCategoryChart(chartElement, titleElement, dataQuery, chartOptio
         	}
         },
         xAxis: {
+        	id: 'xAxis',
             title: {
                 text: ''
             },
@@ -637,18 +681,29 @@ function PrizesByCategoryChart(chartElement, titleElement, dataQuery, chartOptio
             }
         },
 		series: [
-			{name: 'Count', data: pcArr}
+			{id: 'count', name: 'Count', data: pcArr}
 		]
 	});
 
 	function updateTitle() {
-		var msg = 'Prizes by category on <b>'+chartOptions.countryName+'</b> for year <b>'+chartOptions.year+'</b>';
+		var msg;
+		if(chartOptions.year === 'All') {
+			msg = 'Prizes on <b>'+chartOptions.countryName+'</b> grouped by category and for <b>All</b> years';
+		} else {
+			msg = 'Prizes on <b>'+chartOptions.countryName+'</b> grouped by category and for year <b>'+chartOptions.year+'</b>';
+		}
 		$('#'+titleElement).html(msg);
 	}
 
 	function update() {
 		updateTitle();
-		pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(chartOptions.countryCode, chartOptions.year), ['category', 'value'], true);
+		pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(chartOptions.countryCode, chartOptions.died, chartOptions.year), ['category', 'value'], true);
+		categories = [];
+		for(var i=0; i< pcArr.length; i++) { categories.push(pcArr[i][0]);}
+
+		// Update series data
+		categoryChart.get('count').setData(pcArr);
+		categoryChart.get('xAxis').setCategories(categories);
 	}
 
 	return {
@@ -662,8 +717,10 @@ function PrizesByCategoryChart(chartElement, titleElement, dataQuery, chartOptio
  * @param {[type]} chartElement [description]
  * @param {[type]} dataQuery   [description]
  */
-function PrizesBySharedChart(chartElement, dataQuery) {
+function PrizesBySharedChart(chartElement, titleElement, dataQuery) {
 	
+	updateTitle();
+
 	var pslArr = dataQuery.convertToXyArray(dataQuery.prizesByLaureatesShared(), ['shared', 'value']);
 	var categoryChart = new Highcharts.Chart({
 		chart: {
@@ -692,9 +749,31 @@ function PrizesBySharedChart(chartElement, dataQuery) {
             }
         },
 		series: [
-			{name: "# shared", data: pslArr}
+			{id: 'shared', name: "# shared", data: pslArr}
 		]
 	});
+
+	function updateTitle() {
+		var msg;
+		if(chartOptions.year === 'All') {
+			msg = 'Prizes on <b>'+chartOptions.countryName+'</b> grouped by number of shared laureates and for <b>All</b> years';
+		} else {
+			msg = 'Prizes on <b>'+chartOptions.countryName+'</b> grouped by number of shared laureates and for year <b>'+chartOptions.year+'</b>';
+		}
+		$('#'+titleElement).html(msg);
+	}
+
+	function update() {
+		updateTitle();
+		pslArr = dataQuery.convertToXyArray(dataQuery.prizesByLaureatesShared(chartOptions.countryCode, chartOptions.year), ['shared', 'value']);
+
+		// Update series data
+		categoryChart.get('shared').setData(pslArr);
+	}
+
+	return {
+		update: update
+	}
 
 }
 
@@ -725,39 +804,39 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 	prizes = prizesRes[0].prizes;
 
 	var dataQuery = new DataQuery(laureates, prizes);
-	var mapChart = new MapChart('map', 'map-title', dataQuery, chartOptions);
+	var mapChart = new MapChart('map', 'map-title', dataQuery);
 
 	var prizesByYearChart = new PrizesByYearChart(
 		'prizes-by-year-number-laureates-chart', 
 		'prizes-by-year-number-laureates-title', 
-		dataQuery,
-		chartOptions
+		dataQuery
 	);
 	var prizesByCategory = new PrizesByCategoryChart(
 		'prizes-by-category-chart', 
 		'prizes-by-category-title', 
-		dataQuery,
-		chartOptions
+		dataQuery
 	);
 	var prizesBySharedChart = new PrizesBySharedChart(
 		'prizes-shared-by-laureates-number-chart', 
-		dataQuery,
-		chartOptions
+		'prizes-shared-by-laureates-number-title',
+		dataQuery
 	);
 
 	// Listen for events to update charts
 	$(document).on("onCountrySelected", function(e) {
 		prizesByYearChart.update();
 		prizesByCategory.update();
+		prizesBySharedChart.update();
 	});
 
 	$(document).on("onYearSelected", function(e) {
-		console.log(e);
 		prizesByCategory.update();
+		prizesBySharedChart.update();
 	});
 
 	$(document).on("onCategorySelected", function(e) {
 		console.log(e);
+
 	});
 
 });
