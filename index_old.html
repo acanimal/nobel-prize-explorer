@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es-US">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Nobel Prizes</title>
+
+		<link rel="stylesheet" type="text/css" href="simpleCharts.css"/>
+
+		<style>
+			body { 
+			  color: #666; 
+			  background: #f5f5f5; 
+			  font: normal 10px "Helvetica Neue", Helvetica, sans-serif; 
+			  margin: 2em; 
+			}
+			#map {
+			  border: 1px solid #fff;
+			}
+
+			#prizes-by-category-chart {
+			  width: 500px;
+			  height: 200px;
+			}
+
+			#prizes-by-year-number-laureates-chart {
+			  width: 800px;
+			  height: 300px;
+			}
+
+			#prizes-shared-by-laureates-number-chart {
+				width: 500px;
+				height: 100px;
+			}
+
+			.country {
+			  fill: #ccc;
+			  stroke: #fff;
+			  stroke-width: .5px;
+			  stroke-linejoin: round;
+			}
+
+			.hidden { 
+			  display: none; 
+			}
+
+			div.tooltip {
+			  color: #222; 
+			  background: #fff; 
+			  padding: .5em; 
+			  text-shadow: #f5f5f5 0 1px 0;
+			  border-radius: 2px; 
+			  box-shadow: 0px 0px 2px 0px #a6a6a6; 
+			  opacity: 0.9; 
+			  position: absolute;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Novel Prizes</h1>
+
+		<div id="map"></div>
+
+		<p>
+		Prizes by year and # laureates:
+		<div id="prizes-by-year-number-laureates-chart"></div>
+		(Distribution of # laureates per year)
+		</p>
+
+		<p>
+		Prizes by category:
+		<div id="prizes-by-category-chart"></div>
+		(Distribution of prizes by categories)
+		</p>
+
+		<p>
+		Prizes shared by # laureates:
+		<div id="prizes-shared-by-laureates-number-chart"></div>
+		(Distribution of prizes shared by # of laureates)
+		</p>
+
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+		<script src="http://d3js.org/d3.v3.min.js"></script>
+		<script src="http://d3js.org/topojson.v1.min.js"></script>
+		<script src="http://d3js.org/queue.v1.min.js"></script>
+		<script src="libs/crossfilter-1.2.0.min.js"></script>
+		<script src="simpleCharts.js"></script>
+		<script>
+			var topoWorldJson = 'data/world-110m.json';
+			var countryCodesTsv = 'data/world-country-names.tsv';
+
+			var prizesUrl = 'data/prize-prizes.json';
+			var laureatesUrl = 'data/prize-laureates.json';
+			var countriesUrl = 'data/prize-countries.json';
+
+
+			// Load world data
+			queue()
+			    .defer(d3.json, topoWorldJson)
+			    .defer(d3.tsv, countryCodesTsv)
+			    .await(readyMap);
+
+			queue()
+				.defer(d3.json, laureatesUrl)
+				.defer(d3.json, prizesUrl)
+				.await(readyPrize);
+
+			// Prize data loaded
+			function readyPrize(error, laureates, prizes) {
+				// var laureatesCf = crossfilter(laureates.laureates);
+
+				// var laureatesByCountry = laureatesCf.dimension( function(d) { return d.bornCountryCode; }),
+				// 	laureatesByCountryGroup = laureatesByCountry.group( function(d) { return d; });
+
+				// var laureatesByCategory = laureatesCf.dimension( function(d) { return d.bornCountryCode; }),
+				// 	laureatesByCategoryGroup = laureatesByCountry.group( function(d) { return d; });
+
+				var prizesCf = crossfilter(prizes.prizes);
+
+				var prizesByCategory = prizesCf.dimension( function(d) { return d.category; }),
+					prizesByCategoryGroup = prizesByCategory.group( function(d) { return d; });
+
+				var prizesSharedByLaureatesNumber = prizesCf.dimension( function(d){ return d.laureates.length }),
+					prizesSharedByLaureatesNumberGroup = prizesSharedByLaureatesNumber.group(function(d) { return d; });
+
+				var prizesByCategoryChart = SC.horizontalBarChart('#prizes-by-category-chart')
+					.width($('#prizes-by-category-chart').width())
+					.height($('#prizes-by-category-chart').height())
+					.data(prizesByCategoryGroup.all())
+					.render();
+
+				var prizesSharedByLaureatesChart = SC.horizontalBarChart('#prizes-shared-by-laureates-number-chart')
+					.width($('#prizes-shared-by-laureates-number-chart').width())
+					.height($('#prizes-shared-by-laureates-number-chart').height())
+					.data(prizesSharedByLaureatesNumberGroup.all())
+					.render();
+
+				var prizesByYear = prizesCf.dimension(function(d) { return d.year; }),
+					prizesByYearNumberLaureatesGroup = prizesByYear.group().reduceSum(function(d) { return d.laureates.length; });
+
+					console.log(prizes);
+
+					console.log(prizesByYearNumberLaureatesGroup.all());
+
+				var prizesByYearNumberLaureatesChart = SC.lineChart('#prizes-by-year-number-laureates-chart')
+					.width($('#prizes-by-year-number-laureates-chart').width())
+					.height($('#prizes-by-year-number-laureates-chart').height())
+					.data(prizesByYearNumberLaureatesGroup.all())
+					.render();
+
+			}				
+
+			// World map data loaded
+			function readyMap(error, world, names) {
+
+				var mapWidth  = 600,
+			    mapHeight = 300;
+
+				$('#map').css({
+					width: mapWidth,
+					height: mapHeight
+				})
+				var mapPosition = $('#map').position();
+
+				var color = d3.scale.category10();
+
+				var projection = d3.geo.mercator()
+				    .translate([mapWidth/2, mapHeight/1.5])
+				    .scale(100);
+
+				var path = d3.geo.path()
+				    .projection(projection);
+
+				var svg = d3.select("#map").append("svg")
+				    .attr("width", mapWidth)
+				    .attr("height", mapHeight);
+
+				var tooltip = d3.select("#map").append("div")
+				    .attr("class", "tooltip hidden");
+				var countries = topojson.feature(world, world.objects.countries).features;
+
+				countries = countries.filter(function(d) {
+					return names.some(function(n) {
+						if (d.id == n.id) return d.name = n.name;
+					});
+				}).sort(function(a, b) {
+					return a.name.localeCompare(b.name);
+				});
+
+				var country = svg.selectAll(".country").data(countries);
+
+				country
+					.enter()
+					.insert("path")
+					.attr("class", "country")    
+					.attr("title", function(d,i) { return d.name; })
+					.attr("d", path);
+
+				//Show/hide tooltip
+				country
+					.on("mousemove", function(d,i) {
+						var mouse = d3.mouse(svg.node());
+						tooltip
+					  		.classed("hidden", false)
+					  		.attr("style", "left:"+ (mapPosition.left + mouse[0] + 10) +"px;top:"+ (mapPosition.top + mouse[1] - 20)+"px")
+					  		.html(d.name)
+					})
+					.on("mouseout",  function(d,i) {
+						tooltip.classed("hidden", true)
+					});
+
+			}
+
+		</script>
+	</body>
+</html>
