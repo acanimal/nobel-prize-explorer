@@ -305,7 +305,8 @@ function DataQuery(laureates, prizes) {
 		prizesByLaureatesShared: prizesByLaureatesShared,
 		prizesByYear: prizesByYear,
 		laureatesByYear: laureatesByYear,
-		convertToXyArray: convertToXyArray
+		convertToXyArray: convertToXyArray,
+		findLaureateById: findLaureateById
 	}
 
 }
@@ -707,7 +708,19 @@ function CategoryChart(chartElement, titleElement, dataQuery) {
 	var categoryChart = new Highcharts.Chart({
 		chart: {
 			renderTo: chartElement,
-			type: 'column'
+			type: 'column',
+			events: {
+				click: function(e) {
+					chartOptions.category = 'All';
+					updateTitle();
+
+					// Ugly way to trigger events
+					$.event.trigger({
+						type: 'onCategorySelected',
+						message: chartOptions
+					});
+				}
+			}
 		},
 		title: {
             text: ''
@@ -862,29 +875,57 @@ function SharedChart(chartElement, titleElement, dataQuery) {
  */
 var LaureatesTable = function(tableElement, titleElement, dataQuery) {
 
-	var lArr, $el=$('#'+tableElement);
+	var pArr=[], $el=$('#'+tableElement);
+
+	var table = $('#laureates-table').dataTable({
+		"bPaginate": true,
+        "bLengthChange": false,
+        "bFilter": false,
+        "bSort": true,
+        "bInfo": true,
+        "bAutoWidth": false
+	});
 
 	update();
 
 	function update() {
 		pArr = dataQuery.getPrizes();
-		lArr = dataQuery.getLaureates();
 
 		// Remove old values
-		$el.find('tr').remove();
+		table.fnClearTable();
 
 		// Add new info
-		var row = '';
-		for(var i=0; i<100; i++) {
-console.log("Adding prize: "+i+" from "+pArr.length);
+		var row = '', i, j, l;
+		for(i=0; i<pArr.length; i++) {
 
-			row += "<tr>";
-			row += "<td>"+pArr[i].year+"</td>";
-			row += "<td>"+pArr[i].category+"</td>";
-			row += "<td>"+pArr[i].firstname+" "+pArr[i].surename+"</td>";
-			row += "<td>"+pArr[i].motivation+"</td>";
-			row += "</tr>";
-			$el.append(row);
+			if(chartOptions.year && chartOptions.year!='All' && chartOptions.year!=pArr[i].year) {
+				continue;
+			}
+
+			if(chartOptions.category && chartOptions.category!='All' && chartOptions.category!=pArr[i].category) {
+				continue;
+			}
+
+			for(j=0; j< pArr[i].laureates.length; j++) {
+				l = dataQuery.findLaureateById(pArr[i].laureates[j].id);
+
+				if(chartOptions.countryCode && chartOptions.countryCode!='World') {
+					
+					if( (chartOptions.died && l.diedCountryCode!==chartOptions.countryCode) || 
+						(!chartOptions.died && l.bornCountryCode!==chartOptions.countryCode)) {
+						continue;
+					}
+				}
+
+				// Add laureate and prize information
+				table.fnAddData([
+					pArr[i].year,
+					pArr[i].category,
+					l.firstname+" "+l.surname,
+					"motic"
+					// l.motivation
+				]);
+			}			
 		}
 	}
 
@@ -938,34 +979,34 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 		'prizes-shared-by-laureates-number-title',
 		dataQuery
 	);
-
-	// var laureatesTable = new LaureatesTable(
-	// 	'laureates-table',
-	// 	'laureates-title',
-	// 	dataQuery
-	// );
+	var laureatesTable = new LaureatesTable(
+		'laureates-table',
+		'laureates-title',
+		dataQuery
+	);
 
 	// Listen for events to update charts
 	$(document).on("onCountrySelected", function(e) {
 		yearChart.update();
 		categoryChart.update();
 		sharedChart.update();
+		laureatesTable.update();
 	});
 
 	$(document).on("onYearSelected", function(e) {
 		categoryChart.update();
 		sharedChart.update();
+		laureatesTable.update();
 	});
 
 	$(document).on("onCategorySelected", function(e) {
-		console.log(e, "Update TABLE");
-		// laureatesTable.update();
+		laureatesTable.update();
 	});
 
 	$('#loadingMsg').hide(function(){
 		$('#loadingMsg').remove();	
 	});
-	
+
 	// Start the tour
 	// showTour();
 });
