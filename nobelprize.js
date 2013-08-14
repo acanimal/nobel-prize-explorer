@@ -883,19 +883,50 @@ var LaureatesTable = function(tableElement, titleElement, dataQuery) {
         "bFilter": false,
         "bSort": true,
         "bInfo": true,
-        "bAutoWidth": false
+        "bAutoWidth": false,
+        "bProcessing": true
 	});
 
 	update();
 
+	function updateTitle() {
+		var msg = '';
+		if(chartOptions.countryName === 'World') {
+			msg += "Lauretas in the <b>World</b> "
+		} else {
+			if(chartOptions.died) {
+				msg += "Lauretas <em>died</em> in <b>"+chartOptions.countryName+"</b> "
+			}
+			else {
+				msg += "Lauretas <em>born</em> in <b>"+chartOptions.countryName+"</b> "
+			}
+		}
+
+		if(chartOptions.year === 'All') {
+			msg += "for <b>All</b> years "
+		} else {
+			msg += "for year <b>"+chartOptions.year+"</b> "
+		}
+
+		if(chartOptions.category === 'All') {
+			msg += "and for <b>All</b> categories "
+		} else {
+			msg += "and for category <b>"+chartOptions.category+"</b> "
+		}
+
+		$('#'+titleElement).html(msg);
+	}
+
 	function update() {
+		updateTitle();
+
 		pArr = dataQuery.getPrizes();
 
 		// Remove old values
 		table.fnClearTable();
 
 		// Add new info
-		var row = '', i, j, l;
+		var row = '', i, j, l, data = [];
 		for(i=0; i<pArr.length; i++) {
 
 			if(chartOptions.year && chartOptions.year!='All' && chartOptions.year!=pArr[i].year) {
@@ -918,15 +949,16 @@ var LaureatesTable = function(tableElement, titleElement, dataQuery) {
 				}
 
 				// Add laureate and prize information
-				table.fnAddData([
+				data.push([
 					pArr[i].year,
 					pArr[i].category,
 					l.firstname+" "+l.surname,
-					"motic"
-					// l.motivation
+					pArr[i].laureates[j].motivation || ""
 				]);
 			}			
 		}
+
+		table.fnAddData(data);
 	}
 
 	return {
