@@ -555,8 +555,7 @@ function MapChart(mapElement, titleElement, dataQuery) {
 		}).setView([30,0], 2);
 
 		// Listen for zoomend event to fire onCountrySelected event.
-		map.on('zoomend', function(e) {
-
+		map.on('moveend', function() {
 			if(zoomedToFeature) {
 				// Ugly way to trigger events
 				$.event.trigger({
@@ -565,7 +564,7 @@ function MapChart(mapElement, titleElement, dataQuery) {
 				});
 				zoomedToFeature = false;
 			}
-		})
+		});
 
 		// Add controls
 		addInfoControl();
