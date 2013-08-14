@@ -320,7 +320,7 @@ function DataQuery(laureates, prizes) {
  * @param {DataLoad} [dataQuery] Instance of DataQuery to query information.
  */
 function MapChart(mapElement, titleElement, dataQuery) {
-	var map, geojson, previousSelected, info, legend, countryCodes;
+	var map, geojson, previousSelected, info, legend, countryCodes, zoomedToFeature;
 
 	updateTitle();
 	initializeMap();
@@ -475,11 +475,7 @@ function MapChart(mapElement, titleElement, dataQuery) {
 			chartOptions.countryCode = null;
 			updateTitle();
 
-			// Ugly way to trigger events
-			$.event.trigger({
-				type: 'onCountrySelected',
-				message: chartOptions
-			});
+			zoomedToFeature = true;
 		} else {
 			e.target.selected = true;
 			map.fitBounds(e.target.getBounds());
@@ -489,11 +485,7 @@ function MapChart(mapElement, titleElement, dataQuery) {
 
 			updateTitle();
 
-			// Ugly way to trigger events
-			$.event.trigger({
-				type: 'onCountrySelected',
-				message: chartOptions
-			});
+			zoomedToFeature = true;
 		}
 	}
 
@@ -561,6 +553,19 @@ function MapChart(mapElement, titleElement, dataQuery) {
 			minZoom: 1,
 			maxZoom: 7
 		}).setView([30,0], 2);
+
+		// Listen for zoomend event to fire onCountrySelected event.
+		map.on('zoomend', function(e) {
+
+			if(zoomedToFeature) {
+				// Ugly way to trigger events
+				$.event.trigger({
+					type: 'onCountrySelected',
+					message: chartOptions
+				});
+				zoomedToFeature = false;
+			}
+		})
 
 		// Add controls
 		addInfoControl();
