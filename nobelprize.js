@@ -3,11 +3,11 @@
  */
 function DataQuery(laureates, prizes) {
 
-	/**
-	 * Returns an array of laureates applying the need filters.
-	 */
-	var laureates = function() {
-		return laureates.slice(0);
+	var getPrizes = function() {
+		return prizes;
+	}
+	var getLaureates = function() {
+		return laureates;
 	}
 
 	/**
@@ -53,41 +53,40 @@ function DataQuery(laureates, prizes) {
 	 */
 	var prizesByCategory = function(country, died, year) {
 		var result = [], i, j, none;
-		var p, c, item, l, cc;
+		var p, c, item, l, cc, inc;
 		for(i=0; i< prizes.length; i ++) {
 			p = prizes[i];
 			c = p.category;
 			
+			inc = 1;
 			if(year && year!='All' && year!=p.year) {
-				continue;
-			}
-
-			if(country && country!='World') {
-				none = true;
-				// If none of the laureates are from the given country ignore the prize
-				for(j=0; j< p.laureates.length; j++) {
-					l = findLaureateById(p.laureates[j].id);
-					if(died && l.diedCountryCode) {
-						cc = l.diedCountryCode;
-					} else {
-						cc = l.bornCountryCode;
+				inc = 0;
+			} else {
+				if(country && country!='World') {
+					none = true;
+					// If none of the laureates are from the given country ignore the prize
+					for(j=0; j< p.laureates.length; j++) {
+						l = findLaureateById(p.laureates[j].id);
+						if(died && l.diedCountryCode) {
+							cc = l.diedCountryCode;
+						} else {
+							cc = l.bornCountryCode;
+						}
+						if(cc === country) {
+							none = false;
+							break;
+						}
 					}
-					if(cc === country) {
-						none = false;
-						break;
-					}
-				}
-				if(none) {
-					continue;
+					inc = none ? 0 : 1;
 				}
 			}
 
 			// Check if an item with the category exists
 			item = $.grep(result, function(e){ return e.category === c; });
 			if(!item.length) {
-				result.push({category: c, value: 1});
+				result.push({category: c, value: inc});
 			} else {
-				item[0].value++;
+				item[0].value+=inc;
 			}
 		}
 		return result;
@@ -109,19 +108,19 @@ function DataQuery(laureates, prizes) {
 			c = p.category;
 			
 			if(year && year!='All' && year!=p.year) {
-				continue;
-			}
-
-			// Compute increment
-			inc = p.laureates.length;
-			if(country) {
 				inc = 0;
-				for(j=0; j< p.laureates.length; j++) {
-					l = findLaureateById(p.laureates[j].id);
-					if( (died && l.diedCountryCode === country) || l.bornCountryCode === country) {
-						inc++;
+			} else {
+				// Compute increment
+				inc = p.laureates.length;
+				if(country) {
+					inc = 0;
+					for(j=0; j< p.laureates.length; j++) {
+						l = findLaureateById(p.laureates[j].id);
+						if( (died && l.diedCountryCode === country) || l.bornCountryCode === country) {
+							inc++;
+						}
 					}
-				}
+				}	
 			}
 
 			// Check if an item with the category exists
@@ -298,6 +297,8 @@ function DataQuery(laureates, prizes) {
 	}
 
 	return {
+		getPrizes: getPrizes,
+		getLaureates: getLaureates,
 		laureatesByCountry: laureatesByCountry,
 		prizesByCategory: prizesByCategory,
 		laureatesByCategory: laureatesByCategory,
@@ -701,7 +702,7 @@ function CategoryChart(chartElement, titleElement, dataQuery) {
 	var pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(), ['category', 'value'], true);
 
 	var categories = [];
-	for(var i=0; i< pcArr.length; i++) { categories.push(pcArr[i][0]);}
+	for(var i=0; i< lcArr.length; i++) { categories.push(lcArr[i][0]);}
 
 	var categoryChart = new Highcharts.Chart({
 		chart: {
@@ -777,12 +778,12 @@ function CategoryChart(chartElement, titleElement, dataQuery) {
 		lcArr = dataQuery.convertToXyArray(dataQuery.laureatesByCategory(chartOptions.countryCode, chartOptions.died, chartOptions.year), ['category', 'value'], true);
 		pcArr = dataQuery.convertToXyArray(dataQuery.prizesByCategory(chartOptions.countryCode, chartOptions.died, chartOptions.year), ['category', 'value'], true);
 		categories = [];
-		for(var i=0; i< pcArr.length; i++) { categories.push(pcArr[i][0]);}
+		for(var i=0; i< lcArr.length; i++) { categories.push(lcArr[i][0]);}
 
 		// Update series data
+		categoryChart.get('xAxis').setCategories(categories);
 		categoryChart.get('nPrizes').setData(pcArr);
 		categoryChart.get('nLaureates').setData(lcArr);
-		categoryChart.get('xAxis').setCategories(categories);
 	}
 
 	return {
@@ -857,6 +858,42 @@ function SharedChart(chartElement, titleElement, dataQuery) {
 }
 
 /**
+ * Show information for the selected laureates and prizes.
+ */
+var LaureatesTable = function(tableElement, titleElement, dataQuery) {
+
+	var lArr, $el=$('#'+tableElement);
+
+	update();
+
+	function update() {
+		pArr = dataQuery.getPrizes();
+		lArr = dataQuery.getLaureates();
+
+		// Remove old values
+		$el.find('tr').remove();
+
+		// Add new info
+		var row = '';
+		for(var i=0; i<100; i++) {
+console.log("Adding prize: "+i+" from "+pArr.length);
+
+			row += "<tr>";
+			row += "<td>"+pArr[i].year+"</td>";
+			row += "<td>"+pArr[i].category+"</td>";
+			row += "<td>"+pArr[i].firstname+" "+pArr[i].surename+"</td>";
+			row += "<td>"+pArr[i].motivation+"</td>";
+			row += "</tr>";
+			$el.append(row);
+		}
+	}
+
+	return {
+		update: update
+	}
+}
+
+/**
  * General options used for the charts.
  */
 var chartOptions = {
@@ -902,6 +939,12 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 		dataQuery
 	);
 
+	// var laureatesTable = new LaureatesTable(
+	// 	'laureates-table',
+	// 	'laureates-title',
+	// 	dataQuery
+	// );
+
 	// Listen for events to update charts
 	$(document).on("onCountrySelected", function(e) {
 		yearChart.update();
@@ -916,8 +959,7 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 
 	$(document).on("onCategorySelected", function(e) {
 		console.log(e, "Update TABLE");
-
-
+		// laureatesTable.update();
 	});
 
 	$('#loadingMsg').hide(function(){
@@ -925,7 +967,7 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 	});
 	
 	// Start the tour
-	showTour();
+	// showTour();
 });
 
 function showTour() {
