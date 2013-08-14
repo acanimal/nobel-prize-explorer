@@ -1044,7 +1044,7 @@ $.when($.get(laureatesUrl), $.get(prizesUrl))
 	});
 
 	// Start the tour
-	// showTour();
+	showTour();
 });
 
 function showTour() {
