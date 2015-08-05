@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>The Nobel Prize - A visual exploration of the Nobel Prize history</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<!-- Bootstrap -->
+		<link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+		<link href="css/metro.bootstrap.min.css" rel="stylesheet" media="screen">
+		<!-- Leaflet -->
+		<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.6.4/leaflet.css" />
+		<!--[if lte IE 8]>
+		    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.6.4/leaflet.ie.css" />
+		<![endif]-->
+		<!-- IntroJS -->
+		<link href="css/introjs.min.css" rel="stylesheet" media="screen">
+		<!-- DataTables CSS -->
+		<link rel="stylesheet" type="text/css" href="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/css/jquery.dataTables.css">
+		<style>
+			#map {
+				width: 100%;
+				height: 350px;
+				border: 1px solid #ccc;
+			}
+
+			#prizes-by-year-number-laureates-chart {
+				width: 100%;
+				height: 300px;
+			}
+
+			#prizes-by-category-chart {
+				width: 100;
+				height: 250px;
+			}
+
+			#prizes-shared-by-laureates-number-chart {
+				width: 100;
+				height: 210px;
+			}
+
+			.section {
+				margin-top: 15px;
+				border: 1px solid #eee;
+				padding: 5px;
+			}
+
+			.footer {
+				margin-bottom: 15px;
+			}
+
+			.info {
+				padding: 6px 8px;
+				font: 14px/16px Arial, Helvetica, sans-serif;
+				background: white;
+				background: rgba(255,255,255,0.8);
+				box-shadow: 0 0 15px rgba(0,0,0,0.2);
+				border-radius: 5px;
+			}
+
+			.info h4 {
+				margin: 0 0 5px;
+				color: #666;
+				font-size: 0.9em;
+			}
+
+			.legend {
+			    line-height: 18px;
+			    color: #555;
+			}
+			.legend i {
+			    width: 18px;
+			    height: 18px;
+			    float: left;
+			    margin-right: 8px;
+			    opacity: 0.7;
+			}
+
+			#selectedCountry, #selectedYear, #selectedCategory, #queryCountry, #queryYear, #queryCategory {
+				font-weight: bold;;
+			}
+
+			.introjs-helperNumberLayer {
+				display: none;
+			}
+		</style>
+
+	</head>
+	<body>
+
+		<div class="container">
+			<div class="row">
+				<div class="span2">
+					<!--Sidebar content-->
+					<h1>The Nobel Prize</h1>
+					A visual exploration of the Nobel Prize history
+
+					<hr/> 
+
+					Need help? Take a <button class="btn btn-primary btn-small" onclick="showTour()">Tour</button>
+					<hr/> 
+
+					<iframe src="http://ghbtns.com/github-btn.html?user=acanimal&repo=tagger.js&type=fork"
+  allowtransparency="true" frameborder="0" scrolling="0" width="62" height="20"></iframe>
+			        <a href="https://twitter.com/share" class="twitter-share-button" data-via="acanimal" data-hashtags="nobelprize_explorer">Tweet</a>
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+			        <a href="https://twitter.com/acanimal" class="twitter-follow-button" data-show-count="false">Follow @acanimal</a>
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+				</div>
+
+				<div class="span10">
+					
+					<h4 id="loadingMsg">Loading...</h4>
+
+					<div class="row" data-step="1" data-intro="The choropleth map shows the number of laureates born or died in a country.<br/><ul><li>Click on a country to select it and filter information.</li><li>Click again to unselect and choose the whole World again.</li></ul>">
+						
+						<div class="span10 section">
+							<h5 id="map-title"></h5>
+							<div id="map"></div>
+						</div>	
+
+					</div>
+
+					<div class="row" data-step="2" data-intro="Line chart shows the evolution on the number of prizes and the number of laureates a long the years.<ul><li>Click on a year point to select it and filter information by that year.</li><li>Click on the chart to unselect and choose the whole period again.</li></ul>">
+							
+						<div class="span10 section" id="tourYearChart">
+							<h5 id="prizes-by-year-number-laureates-title"></h5>
+							<div id="prizes-by-year-number-laureates-chart"></div>
+						</div>
+
+					</div>
+
+					<div class="row">
+						<div class="span6 section" id="tourCategoriesChart" data-step="3" data-intro="Column chart shows the number of laureates and prizes grouped by categories.<ul><li>Click on a category column to select it and filter information by that category.</li><li>Click on the chart to unselect and choose the whole period again.</li></ul>">
+							<h5 id='prizes-by-category-title'></h5>
+							<div id="prizes-by-category-chart"></div>
+						</div>
+						<div class="span4 section" id="tourShareChart" data-step="4" data-intro="This column chart shows the number of prizes shared by laureates. For example, you can see how many prizes has been shared by three laureates.">
+							<h5 id="prizes-shared-by-laureates-number-title"></h5>
+							<div id="prizes-shared-by-laureates-number-chart"></div>
+						</div>					
+					</div>
+
+					<div class="row footer" data-step="5" data-intro="The table shows the results of the previously filtered information: prize and laureates information.">
+						<div class="span10 section">
+							<h5 id="laureates-title"></h5>
+							
+							<table class="table" id="laureates-table">
+				              <thead>
+				                <tr>
+				                  <th>Year</th>
+				                  <th>Category</th>
+
+				                  <th>Name</th>
+				                  <th>Motivation</th>
+				                </tr>
+				              </thead>
+				              <tbody>
+				                <tr>
+				                  <td>1</td>
+				                  <td>Mark</td>
+				                  <td>Otto</td>
+				                  <td>@mdo</td>
+				                </tr>
+				                <tr>
+				                  <td>1</td>
+				                  <td>bbbbb</td>
+				                  <td>Otto</td>
+				                  <td>@mdo</td>
+				                </tr>
+				                <tr>
+				                  <td>1</td>
+				                  <td>zzzz</td>
+				                  <td>Otto</td>
+				                  <td>@mdo</td>
+				                </tr>
+				                <tr>
+				                  <td>1</td>
+				                  <td>Mark</td>
+				                  <td>Otto</td>
+				                  <td>@mdo</td>
+				                </tr>
+				              </tbody>
+				            </table>
+
+						</div>
+					</div>
+				</div>
+
+			</div>
+		</div>
+
+		<ol id="tour" style="display: none;">
+			<li data-target="#tourMapChart" data-angle="130">
+				The first step in the tour
+			</li>
+			<li data-target="tourYearChart" data-options="distance:20">
+				This is the second step in the tour
+			</li>
+		</ol>
+
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+		<script src="js/bootstrap.min.js"></script>
+		<script src="http://cdn.leafletjs.com/leaflet-0.6.4/leaflet.js"></script>
+		<script src="http://code.highcharts.com/highcharts.js"></script>
+		<script src="js/intro.min.js"></script>
+		<script src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.4/jquery.dataTables.min.js"></script>
+		<script src="nobelprize.js"></script>
+		<script type="text/javascript">
+
+	      var _gaq = _gaq || [];
+	      _gaq.push(['_setAccount', 'UA-8297669-6']);
+	      _gaq.push(['_trackPageview']);
+
+	      (function() {
+	        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+	        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+	        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+	      })();
+
+	    </script>
+	</body>
+</html>
